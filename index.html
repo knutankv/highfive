@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>High five!</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="High five!">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="mask-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M0 3a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H3a3 3 0 0 1-3-3zm3 9 1.3.8L6.2 9.6l3 3 4.9-7.3-1.3-.9-3.8 5.7-3-3z'/%3E%3C/svg%3E" color="#2a78d6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232a78d6'/%3E%3Cpath d='M3 12 6 7l3 3 4-6' stroke='white' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
 <style>
 :root {
@@ -194,33 +202,68 @@ table.grid th:first-child { position: sticky; left: 0; background: var(--surface
 .help-card ul { margin: 0; padding-left: 18px; line-height: 1.65; } .help-card kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
 .help-card .top { display: flex; justify-content: space-between; align-items: start; }
 @media (max-width: 900px) { :root { --left-w: 220px; --right-w: 300px; } .feature-list { grid-template-columns: repeat(2, auto); } }
+.lbl-s, #mnav { display: none; }
+.plot-overlay, .plot3d-canvas { touch-action: none; }
+html { -webkit-text-size-adjust: 100%; } button, .tnode, .chip, .ptype, #mnav button { touch-action: manipulation; }
+@media (hover: none) { .tadd { display: inline-grid; } .tnode.tfile .tclose { display: inline-grid; } }
+@media (max-width: 760px) {
+  :root { --nav-h: 56px; }
+  html, body { height: 100%; height: 100dvh; }
+  .topbar { gap: 6px; padding: 0 8px; padding-top: env(safe-area-inset-top); height: calc(48px + env(safe-area-inset-top)); }
+  .brand { margin-right: 2px; font-size: 15px; } .brand small, #status { display: none; }
+  .topbar .lbl { display: none; } .topbar .lbl-s { display: inline; } #btnOpen { width: 36px; padding: 0; justify-content: center; }
+  .topbar .btn { height: 34px; } .icon-btn { width: 36px; height: 36px; } .icon-btn svg { width: 18px; height: 18px; }
+  .layout { display: block; height: calc(100% - 48px - env(safe-area-inset-top) - var(--nav-h) - env(safe-area-inset-bottom)); }
+  .splitter { display: none; }
+  .layout > .pane, .layout > .center { display: none; height: 100%; }
+  body[data-mp="tree"] #paneTree, body[data-mp="config"] #paneConfig { display: flex; }
+  body[data-mp="center"] #paneCenter, body:not([data-mp]) #paneCenter { display: flex; }
+  #mnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--nav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); z-index: 40; }
+  #mnav button { flex: 1; border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--text-muted); cursor: pointer; }
+  #mnav button svg { width: 22px; height: 22px; } #mnav button.on { color: var(--accent); }
+  .tabs { padding: 4px 6px 0; overflow-x: auto; scrollbar-width: none; } .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 10px 11px 11px; white-space: nowrap; } .tabs .lbl { display: none; } .tabs .btn { width: 34px; height: 32px; padding: 0; justify-content: center; flex: none; }
+  #viewPlot { padding: 6px; gap: 6px; } #viewInfo, #viewData { padding: 8px; } .info-card { padding: 14px; }
+  .feature-list { grid-template-columns: 1fr; width: auto; } #plotEmpty { padding: 16px; } #plotEmpty .row-btns { flex-wrap: wrap; }
+  .tnode { height: 38px; font-size: 14px; padding-left: calc(6px + var(--d) * 16px); } .caret { width: 26px; height: 32px; line-height: 32px; font-size: 12px; }
+  .tadd { width: 30px; height: 30px; font-size: 17px; } .tclose { font-size: 13px; }
+  .pane-head { padding: 8px; } .pane-head input { height: 36px; }
+  /* 16px inputs stop iOS Safari from zooming the page on focus */
+  input, select, .pane-head input, .row input[type=text], .row input:not([type]), .row select, .row2 input, .row2 select, .axes-grid input[type=text], .axes-grid input:not([type]), .inline input { font-size: 16px; }
+  .row input[type=text], .row input:not([type]), .row select, .row2 input, .row2 select, .axes-grid input:not([type]) { height: 36px; }
+  .row > label:first-child { width: 78px; } .chip { height: 32px; padding: 0 12px; } .ptype { padding: 9px 2px 8px; font-size: 11px; }
+  .sec { padding: 12px 10px 14px; } .cmap-prev { margin-left: 86px; } .axes-grid { grid-template-columns: 18px 28px 1fr 1fr 1.2fr; }
+  .plot-tip { max-width: calc(100vw - 30px); }
+  #toasts { left: 10px; right: 10px; max-width: none; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px); } .toast { max-width: 100%; }
+  #help { padding: 10px; } .help-card { padding: 16px 16px; max-height: 92dvh; }
+}
 </style>
 </head>
 <body>
 <header class="topbar">
   <div class="brand"><span class="logo"><svg viewBox="0 0 16 16"><path d="M3 12 6 7l3 3 4-6"/></svg></span>High five! <small>offline HDF5 viewer &amp; analysis</small></div>
-  <button class="btn primary" id="btnOpen"><svg viewBox="0 0 16 16"><path d="M2 5V3.5a1 1 0 0 1 1-1h3.5l1.5 1.5h5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg>Open files…</button>
-  <button class="btn" id="btnDemo">Demo data</button>
+  <button class="btn primary" id="btnOpen" title="Open files"><svg viewBox="0 0 16 16"><path d="M2 5V3.5a1 1 0 0 1 1-1h3.5l1.5 1.5h5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg><span class="lbl">Open files…</span></button>
+  <button class="btn" id="btnDemo"><span class="lbl">Demo data</span><span class="lbl-s">Demo</span></button>
   <input type="file" id="fileInput" multiple hidden accept=".h5,.hdf5,.hdf,.he5,.nc,.nc4,.mat,.nxs,.cdf,*/*">
   <span class="spacer"></span><span id="status"></span>
   <button class="icon-btn" id="btnHelp" title="Help"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.4M8 11.6v.3" stroke-linecap="round"/></svg></button>
   <button class="icon-btn" id="btnTheme" title="Toggle light/dark"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11A5.5 5.5 0 0 0 8 2.5z" fill="currentColor"/></svg></button>
 </header>
 <main class="layout">
-  <aside class="pane">
+  <aside class="pane" id="paneTree">
     <div class="pane-head"><input id="treeSearch" placeholder="Filter loaded objects…" spellcheck="false">
       <button class="icon-btn" id="btnExpandAll" title="Expand all groups"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4M4 2.5h8M4 13.5h8" stroke-linecap="round"/></svg></button>
       <button class="icon-btn" id="btnCollapseAll" title="Collapse all groups"><svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4M4 2.5h8M4 13.5h8" stroke-linecap="round"/></svg></button></div>
     <div id="tree"></div>
   </aside>
   <div class="splitter" data-side="left"></div>
-  <section class="center">
+  <section class="center" id="paneCenter">
     <nav class="tabs">
       <button class="tab on" data-tab="plot">Plot</button><button class="tab" data-tab="data">Data</button><button class="tab" data-tab="info">Info &amp; attributes</button>
       <span class="spacer"></span>
-      <button class="btn" id="btnReset" title="Reset zoom (or double-click the plot)"><svg viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.5H5" stroke-linecap="round"/></svg>Reset view</button>
-      <button class="btn" id="btnPng"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3.5 3 3 2-2 2.5 2.5"/></svg>PNG</button>
-      <button class="btn" id="btnCsv"><svg viewBox="0 0 16 16"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke-linecap="round"/></svg>CSV</button>
+      <button class="btn" id="btnReset" title="Reset zoom (or double-click the plot)"><svg viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.5H5" stroke-linecap="round"/></svg><span class="lbl">Reset view</span></button>
+      <button class="btn" id="btnPng" title="Export PNG"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3.5 3 3 2-2 2.5 2.5"/></svg><span class="lbl">PNG</span></button>
+      <button class="btn" id="btnCsv" title="Export CSV"><svg viewBox="0 0 16 16"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke-linecap="round"/></svg><span class="lbl">CSV</span></button>
     </nav>
     <div class="view" id="viewPlot">
       <div id="warnings" class="warnings" hidden></div>
@@ -239,8 +282,13 @@ table.grid th:first-child { position: sticky; left: 0; background: var(--surface
     <div class="view" id="viewInfo" hidden></div>
   </section>
   <div class="splitter" data-side="right"></div>
-  <aside class="pane"><div id="config"></div></aside>
+  <aside class="pane" id="paneConfig"><div id="config"></div></aside>
 </main>
+<nav id="mnav">
+  <button data-mp="tree"><svg viewBox="0 0 16 16"><path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/></svg>Files</button>
+  <button data-mp="center" class="on"><svg viewBox="0 0 16 16"><path d="M2 2v12h12M4.5 10.5l3-4 2.5 2.5 3.5-5"/></svg>Plot</button>
+  <button data-mp="config"><svg viewBox="0 0 16 16"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>Settings</button>
+</nav>
 <div id="toasts"></div>
 <div id="dropzone" hidden>Drop HDF5 files to open</div>
 <div id="help" hidden><div class="help-card">
@@ -261,6 +309,7 @@ table.grid th:first-child { position: sticky; left: 0; background: var(--surface
   </ul>
   <h4>Mouse</h4><ul>
     <li>2-D: drag to box-zoom (a thin horizontal drag zooms X only, vertical zooms Y only), <kbd>Shift</kbd>-drag or right-drag to pan, wheel to zoom (<kbd>Shift</kbd>: X only, <kbd>Alt</kbd>: Y only), double-click to reset, click legend entries to hide series.</li>
+    <li>Touch: drag to pan (rotate in 3-D), pinch to zoom (spread fingers horizontally for X only, vertically for Y only), tap for a readout or to toggle a legend entry, double-tap to reset. On phones, use the bottom bar to switch between Files, Plot and Settings; double-tap a dataset for a quick plot.</li>
     <li>3-D: drag to rotate, <kbd>Shift</kbd>-drag to pan, wheel to zoom, double-click to reset.</li>
   </ul>
   <h4>Format support</h4><ul>
@@ -1882,6 +1931,42 @@ class Plot2D {
     ov.addEventListener('dblclick', () => this.resetView());
     ov.addEventListener('mousemove', e => { if (drag) return; this._hover(...pos(e)); });
     ov.addEventListener('mouseleave', () => { this.tip.hidden = true; if (this.m) ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); if (this.opts.onHover) this.opts.onHover(null); });
+    // touch: one finger pans, two fingers pinch-zoom (per axis by finger spread), tap = readout / legend toggle, double-tap = reset
+    let tch = null, lastTap = 0;
+    const tpos = t => { const r = ov.getBoundingClientRect(); return [t.clientX - r.left, t.clientY - r.top]; };
+    const pan1 = t => { const [x, y] = tpos(t); return { x, y, v: { ...this.view }, moved: false }; };
+    ov.addEventListener('touchstart', e => {
+      if (!this.spec || !this.view) return; e.preventDefault(); const ts = e.touches;
+      if (ts.length === 1) tch = pan1(ts[0]);
+      else { const [ax, ay] = tpos(ts[0]), [bx, by] = tpos(ts[1]); tch = { pinch: true, cx: (ax + bx) / 2, cy: (ay + by) / 2, dx: Math.max(40, Math.abs(ax - bx)), dy: Math.max(40, Math.abs(ay - by)), v: { ...this.view }, moved: true }; this.tip.hidden = true; }
+    }, { passive: false });
+    ov.addEventListener('touchmove', e => {
+      if (!tch || !this.m) return; e.preventDefault(); const ts = e.touches, v0 = tch.v;
+      const sx = (v0.x1 - v0.x0) / this.pw, sy = (v0.y1 - v0.y0) / this.ph;
+      if (tch.pinch && ts.length >= 2) {
+        const [ax, ay] = tpos(ts[0]), [bx, by] = tpos(ts[1]); const cx = (ax + bx) / 2, cy = (ay + by) / 2;
+        const wx = (v0.x1 - v0.x0) * tch.dx / Math.max(40, Math.abs(ax - bx)), wy = (v0.y1 - v0.y0) * tch.dy / Math.max(40, Math.abs(ay - by));
+        const px = v0.x0 + (tch.cx - this.m.l) * sx, py = v0.y0 + (this.m.t + this.ph - tch.cy) * sy;
+        const x0 = px - (cx - this.m.l) / this.pw * wx, y0 = py - (this.m.t + this.ph - cy) / this.ph * wy;
+        this.view = { x0, x1: x0 + wx, y0, y1: y0 + wy };
+      } else if (!tch.pinch && ts.length === 1) {
+        const [x, y] = tpos(ts[0]); if (!tch.moved && Math.hypot(x - tch.x, y - tch.y) < 8) return;
+        if (!tch.moved) { tch.moved = true; this.tip.hidden = true; ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); }
+        const dx = (x - tch.x) * sx, dy = (y - tch.y) * sy; this.view = { x0: v0.x0 - dx, x1: v0.x1 - dx, y0: v0.y0 + dy, y1: v0.y1 + dy };
+      } else return;
+      this.userView = true; this.render();
+    }, { passive: false });
+    ov.addEventListener('touchend', e => {
+      if (!tch) return;
+      if (e.touches.length) { if (tch.pinch) { tch = pan1(e.touches[0]); tch.moved = true; } return; }
+      const t = tch; tch = null;
+      if (t.moved) { if (this.opts.onView) this.opts.onView(); return; }
+      const now = Date.now(); if (now - lastTap < 320) { lastTap = 0; this.tip.hidden = true; this.resetView(); return; } lastTap = now;
+      const lb = (this.legendBoxes || []).find(b => t.x >= b.x && t.x <= b.x + b.w && t.y >= b.y && t.y <= b.y + b.h);
+      if (lb) { this.hidden.has(lb.name) ? this.hidden.delete(lb.name) : this.hidden.add(lb.name); this.render(); return; }
+      this._hover(t.x, t.y);
+    });
+    ov.addEventListener('touchcancel', () => { tch = null; });
   }
   _hover(x, y) {
     const g = this.ov.getContext('2d'); g.clearRect(0, 0, this.ov.width, this.ov.height);
@@ -1944,7 +2029,7 @@ function drawColorbar(g, th, h, x, y, hgt) {
 class Plot3D {
   constructor(el, opts = {}) {
     this.el = el; this.opts = opts; el.classList.add('plot-host');
-    this.cv = document.createElement('canvas'); this.tip = document.createElement('div'); this.tip.className = 'plot-tip'; this.tip.hidden = true;
+    this.cv = document.createElement('canvas'); this.cv.className = 'plot3d-canvas'; this.tip = document.createElement('div'); this.tip.className = 'plot-tip'; this.tip.hidden = true;
     el.append(this.cv, this.tip); this.az = -0.9; this.el_ = 0.55; this.zoom = 1; this.panX = 0; this.panY = 0;
     this.ro = new ResizeObserver(() => this.render()); this.ro.observe(el); this._events();
   }
@@ -2054,7 +2139,7 @@ class Plot3D {
     { const p = P(best.x, best.y, zs); g.textAlign = 'center'; g.fillText(s.zlabel || 'z', p[0], p[1] - 16); }
     if (s.title) { g.font = `600 13px ${th.font}`; g.textAlign = 'left'; g.fillText(s.title, 14, 16); }
     drawColorbar(g, th, { cmap: s.cmap, reverse: s.reverse, zrangeT: this.r.cr, zlog: s.zlog, zlabel: s.clabel || s.zlabel }, W - 86, 40, H - 80);
-    g.fillStyle = th.fg2; g.font = `11px ${th.font}`; g.textAlign = 'left'; g.fillText('drag: rotate · shift-drag: pan · wheel: zoom · double-click: reset', 14, H - 12);
+    g.fillStyle = th.fg2; g.font = `11px ${th.font}`; g.textAlign = 'left'; g.fillText(matchMedia('(hover: none)').matches ? 'drag: rotate · two fingers: zoom & pan · double-tap: reset' : 'drag: rotate · shift-drag: pan · wheel: zoom · double-click: reset', 14, H - 12);
   }
   _events() {
     let drag = null; const c = this.cv;
@@ -2067,17 +2152,46 @@ class Plot3D {
     c.addEventListener('wheel', e => { e.preventDefault(); this.zoom *= Math.exp(-Math.sign(e.deltaY) * 0.1); this.zoom = Math.max(0.2, Math.min(8, this.zoom)); this.render(); }, { passive: false });
     c.addEventListener('dblclick', () => this.resetView());
     c.addEventListener('mousemove', e => {
-      if (drag || !this.proj) return; const r = c.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top;
-      const pr = this.proj; let bi = -1, bd = 144, bz = Infinity;
-      for (let k = 0; k < pr.length / 3; k++) { const dx = pr[k * 3] - x, dy = pr[k * 3 + 1] - y; const d = dx * dx + dy * dy; if (d < bd || (d < 144 && Math.abs(d - bd) < 1 && pr[k * 3 + 2] < bz)) { bd = d; bi = k; bz = pr[k * 3 + 2]; } }
-      if (bi < 0) { this.tip.hidden = true; return; }
-      const s = this.spec, M = this.mesh; let rows;
-      if (s.kind === 'surface') { const i = bi % M.gx, j = Math.floor(bi / M.gx); rows = [[s.xlabel || 'x', fmtVal(s.x[M.ix[i]])], [s.ylabel || 'y', fmtVal(s.y[M.iy[j]])], [s.zlabel || 'z', fmtVal(M.V[bi])]]; }
-      else rows = [[s.xlabel || 'x', fmtVal(s.x[bi])], [s.ylabel || 'y', fmtVal(s.y[bi])], [s.zlabel || 'z', fmtVal(s.z[bi])], ['index', String(bi)]];
-      this.tip.innerHTML = rows.map(r2 => `<div><span class="k">${esc(r2[0])}</span><span class="v">${esc(r2[1])}</span></div>`).join('');
-      this.tip.hidden = false; this.tip.style.left = Math.min(x + 14, this.W - this.tip.offsetWidth - 4) + 'px'; this.tip.style.top = Math.min(y + 14, this.H - this.tip.offsetHeight - 4) + 'px';
+      if (drag || !this.proj) return; const r = c.getBoundingClientRect(); this._hoverAt(e.clientX - r.left, e.clientY - r.top);
     });
     c.addEventListener('mouseleave', () => { this.tip.hidden = true; });
+    // touch: one finger rotates, two fingers zoom + pan, tap = readout, double-tap = reset
+    let tch = null, lastTap = 0;
+    const tp = t => { const r = c.getBoundingClientRect(); return [t.clientX - r.left, t.clientY - r.top]; };
+    const two = ts => { const [ax, ay] = tp(ts[0]), [bx, by] = tp(ts[1]); return { cx: (ax + bx) / 2, cy: (ay + by) / 2, d: Math.max(10, Math.hypot(ax - bx, ay - by)) }; };
+    const rot1 = t => { const [x, y] = tp(t); return { x, y, az: this.az, el: this.el_, moved: false }; };
+    c.addEventListener('touchstart', e => {
+      e.preventDefault(); const ts = e.touches; this.tip.hidden = true;
+      tch = ts.length === 1 ? rot1(ts[0]) : { pinch: true, ...two(ts), zoom: this.zoom, px: this.panX, py: this.panY, moved: true };
+    }, { passive: false });
+    c.addEventListener('touchmove', e => {
+      if (!tch) return; e.preventDefault(); const ts = e.touches;
+      if (tch.pinch && ts.length >= 2) { const p = two(ts); this.zoom = Math.max(0.2, Math.min(8, tch.zoom * p.d / tch.d)); this.panX = tch.px + p.cx - tch.cx; this.panY = tch.py + p.cy - tch.cy; }
+      else if (!tch.pinch && ts.length === 1) {
+        const [x, y] = tp(ts[0]); const dx = x - tch.x, dy = y - tch.y; if (!tch.moved && Math.hypot(dx, dy) < 8) return; tch.moved = true;
+        this.az = tch.az - dx * 0.01; this.el_ = Math.max(-1.5, Math.min(1.5, tch.el + dy * 0.01));
+      } else return;
+      this.render();
+    }, { passive: false });
+    c.addEventListener('touchend', e => {
+      if (!tch) return;
+      if (e.touches.length) { if (tch.pinch) { tch = rot1(e.touches[0]); tch.moved = true; } return; }
+      const t = tch; tch = null; if (t.moved) return;
+      const now = Date.now(); if (now - lastTap < 320) { lastTap = 0; this.resetView(); return; } lastTap = now;
+      this._hoverAt(t.x, t.y);
+    });
+    c.addEventListener('touchcancel', () => { tch = null; });
+  }
+  _hoverAt(x, y) {
+    if (!this.proj) return;
+    const pr = this.proj; let bi = -1, bd = 144, bz = Infinity;
+    for (let k = 0; k < pr.length / 3; k++) { const dx = pr[k * 3] - x, dy = pr[k * 3 + 1] - y; const d = dx * dx + dy * dy; if (d < bd || (d < 144 && Math.abs(d - bd) < 1 && pr[k * 3 + 2] < bz)) { bd = d; bi = k; bz = pr[k * 3 + 2]; } }
+    if (bi < 0) { this.tip.hidden = true; return; }
+    const s = this.spec, M = this.mesh; let rows;
+    if (s.kind === 'surface') { const i = bi % M.gx, j = Math.floor(bi / M.gx); rows = [[s.xlabel || 'x', fmtVal(s.x[M.ix[i]])], [s.ylabel || 'y', fmtVal(s.y[M.iy[j]])], [s.zlabel || 'z', fmtVal(M.V[bi])]]; }
+    else rows = [[s.xlabel || 'x', fmtVal(s.x[bi])], [s.ylabel || 'y', fmtVal(s.y[bi])], [s.zlabel || 'z', fmtVal(s.z[bi])], ['index', String(bi)]];
+    this.tip.innerHTML = rows.map(r2 => `<div><span class="k">${esc(r2[0])}</span><span class="v">${esc(r2[1])}</span></div>`).join('');
+    this.tip.hidden = false; this.tip.style.left = Math.max(4, Math.min(x + 14, this.W - this.tip.offsetWidth - 4)) + 'px'; this.tip.style.top = Math.max(4, Math.min(y + 14, this.H - this.tip.offsetHeight - 4)) + 'px';
   }
   toPNG() { return this.cv.toDataURL('image/png'); }
 }
@@ -2204,6 +2318,7 @@ function parseSlice(str, shape) {
 /* ------------------------------ files & tree ------------------------------ */
 let fileSeq = 0;
 async function openFiles(list) {
+  if (isPhone() && list.length) mShow('tree');
   for (const file of list) {
     try {
       setStatus('Opening ' + file.name + '…');
@@ -2216,12 +2331,15 @@ async function openFiles(list) {
   setStatus(''); updateEmpty();
 }
 function openDemo() {
+  if (isPhone()) mShow('tree');
   if (S.files.some(f => f.demo)) return;
   const d = makeDemo(); const f = { id: ++fileSeq, name: d.name, root: d.root, demo: true }; S.files.push(f);
   renderTree(); expandNode(f, f.root, true).then(async () => { for (const k of await f.root.children()) if (k.kind === 'group') await expandNode(f, k, true); });
   updateEmpty();
 }
 const treeState = new Map(); // key fileId:path -> {open, kids}
+const isPhone = () => matchMedia('(max-width: 760px)').matches;
+function mShow(p) { document.body.dataset.mp = p; $$('#mnav button').forEach(b => b.classList.toggle('on', b.dataset.mp === p)); }
 const tkey = (f, p) => f.id + ':' + p;
 async function expandNode(f, node, open = true) {
   const k = tkey(f, node.path); let st = treeState.get(k); if (!st) { st = { open: false, kids: null }; treeState.set(k, st); }
@@ -2272,6 +2390,7 @@ async function nodeByPath(f, path) {
   return cur;
 }
 function wireTree() {
+  let lastTap = { k: null, t: 0 };
   $('#tree').addEventListener('click', async e => {
     const el = e.target.closest('.tnode'); if (!el) return; const f = S.files.find(x => x.id === +el.dataset.f); const node = findNode(f, el.dataset.p); if (!node) return;
     if (e.target.closest('[data-close]')) { closeFile(f); return; }
@@ -2287,8 +2406,11 @@ function wireTree() {
     }
     if (node.kind === 'link' && node.linkType === 'soft' && f.h5) { try { const tgt = await f.h5.get(node.target); select(f, tgt); toast('Followed soft link to ' + node.target); } catch (err) { toast(err.message, 'error'); } return; }
     select(f, node);
+    // native dblclick is unreliable on touch screens, so detect a double-tap here on phones
+    if (isPhone() && node.kind === 'dataset') { const k = tkey(f, node.path), now = Date.now(); if (lastTap.k === k && now - lastTap.t < 400) { lastTap.k = null; quickPlot(f, node); } else lastTap = { k, t: now }; }
   });
   $('#tree').addEventListener('dblclick', e => {
+    if (isPhone()) return;
     const el = e.target.closest('.tnode'); if (!el) return; const f = S.files.find(x => x.id === +el.dataset.f); const node = findNode(f, el.dataset.p);
     if (node && node.kind === 'dataset') quickPlot(f, node);
   });
@@ -2455,6 +2577,7 @@ function cleanupRefs(id) {
   for (const k of ['xcomp', 'ycomp', 'zcomp', 'ccomp']) if (P[k] === id) P[k] = ''; if (P.xsrc === id) P.xsrc = 'index'; if (P.spg.comp === id) P.spg.comp = '';
 }
 async function quickPlot(f, node) {
+  if (isPhone()) mShow('center');
   if (!plottable(node.dtype)) { select(f, node); setTab('data'); return; }
   S.comps = []; for (const k of ['xcomp', 'ycomp', 'zcomp', 'ccomp']) S.plot[k] = ''; S.plot.y = []; S.plot.xsrc = 'index'; S.plot.spg.comp = '';
   const c = await addComponent(f, node, { silent: true }); if (!c) return;
@@ -2911,6 +3034,7 @@ function init() {
     const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); if (plot2d) plot2d.render(); if (plot3d) plot3d.render(); };
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); e.preventDefault();
   }));
+  $$('#mnav button').forEach(b => b.onclick = () => mShow(b.dataset.mp));
   window.HighFive = { S, openFiles, openDemo, addComponent, quickPlot, setPlotType, schedule, renderConfig, findNode, nodeByPath, doPlot };
 }
 document.addEventListener('DOMContentLoaded', init);

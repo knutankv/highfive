@@ -299,7 +299,7 @@ html { -webkit-text-size-adjust: 100%; } button, .tnode, .chip, .ptype, #mnav bu
     <li>Use the <b>Slice</b> field with numpy syntax: <code>:</code> all, <code>5</code> one index, <code>100:2000</code>, <code>::10</code> every 10th, <code>:, 2</code> column 2, <code>0, :, :</code> first frame of a cube. Fixed indices get sliders.</li>
     <li>The <b>processing</b> panel (sliders icon) applies, in order: scale × / offset +, detrend, Butterworth filter (zero-phase optional), smoothing, then an operation (single/double derivative or integral, dB, normalize…).</li>
     <li><b>Legend labels</b>: by default series are named by sensor / group (<i>parent group/dataset [units]</i>); switch <i>Legend labels</i> to <i>letters</i> in the style settings to show component letters (A, B…) instead.</li>
-    <li><b>Reuse processing</b>: in a component's processing panel, <i>Copy settings</i> saves them (kept in the browser across sessions and files), <i>Paste</i> applies them to another component, and <i>Apply to all</i> copies them to every other component.</li>
+    <li><b>Reuse processing</b>: in a component's processing panel, <i>Copy settings</i> saves them (kept in the browser across sessions and files), <i>Paste</i> applies them to another component, and <i>Apply to all</i> copies them to every other component. <i>Reset</i> clears one component's processing; <i>Reset all processing</i> (next to the Components heading) clears every component.</li>
     <li><b>Integration drift</b>: integrating amplifies offsets and low-frequency noise into ramps (and parabolas for double integration). The double integral removes a linear trend after each pass; if a high-pass or band-pass filter is set, it is re-applied after each integration (the single integral does this too when such a filter is set). For acceleration → displacement, use a high-pass around 0.5 Hz with zero-phase on.</li>
     <li>Choose the <b>X axis</b>: sample index, a generated time axis (t₀ + sample rate or step), or another component. Its spacing defines the sample rate used by filters and spectra; you can override it.</li>
     <li>For 2-D components, choose which dimension the signals run along — each column (or row) becomes its own trace.</li>
@@ -2532,12 +2532,14 @@ function defaultSlice(node) {
   if (sh.length === 2) return '';
   return sh.slice(0, -2).map(() => '0').concat([':', ':']).join(', ');
 }
+const DEFAULT_PROC = { scale: 1, offset: 0, detrend: 'none', ftype: 'none', order: 4, f1: '', f2: '', zerophase: true, smooth: 'none', swin: 9, op: 'none' };
+const hasProc = c => Object.keys(DEFAULT_PROC).some(k => c.proc[k] != DEFAULT_PROC[k]);
 async function addComponent(f, node, opts = {}) {
   if (!plottable(node.dtype)) { toast('Only numeric datasets can be plotted', 'error'); return null; }
   if (S.comps.length >= 26) { toast('Maximum 26 components', 'error'); return null; }
   const id = nextLetter();
   const c = { id, file: f, node, path: node.path, name: node.name, slice: opts.slice != null ? opts.slice : defaultSlice(node), field: null, units: '', expanded: false,
-    axis: 0, proc: { scale: 1, offset: 0, detrend: 'none', ftype: 'none', order: 4, f1: '', f2: '', zerophase: true, smooth: 'none', swin: 9, op: 'none' }, hint: {} };
+    axis: 0, proc: { ...DEFAULT_PROC }, hint: {} };
   if (node.dtype.cls === 'compound') c.field = node.dtype.members.find(m => H5Lite.isNumericType(m.type) && m.type.cls !== 'array')?.name || null;
   if (node.shape.length >= 2) { const sh = node.shape; c.axis = sh[0] >= sh[1] ? 0 : 1; }
   S.comps.push(c);
@@ -2908,7 +2910,7 @@ function compCard(c) {
         ? `Drift removal: linear detrend + the ${p.ftype} filter above re-applied after ${p.op === 'integ2' ? 'each integration pass' : 'integrating'}.`
         : p.op === 'integ2' ? 'Drift removal: linear detrend after each pass only. Set a high-pass (e.g. 0.5 Hz, zero-phase) for usable displacement — it is re-applied after each pass.'
         : 'Plain running integral. Set a high-pass to remove drift (it is then re-applied after integrating).'}</div>` : ''}
-      <div class="row"><button class="btn small" data-act="procCopy" title="Save these processing settings (kept across sessions)">Copy settings</button><button class="btn small" data-act="procPaste" ${loadProcClip() ? '' : 'disabled'} title="Apply the saved processing settings to ${c.id}">Paste</button>${S.comps.length > 1 ? `<button class="btn small" data-act="procAll" title="Apply ${c.id}'s processing settings to all other components">Apply to all</button>` : ''}</div>
+      <div class="row"><button class="btn small" data-act="procCopy" title="Save these processing settings (kept across sessions)">Copy settings</button><button class="btn small" data-act="procPaste" ${loadProcClip() ? '' : 'disabled'} title="Apply the saved processing settings to ${c.id}">Paste</button>${S.comps.length > 1 ? `<button class="btn small" data-act="procAll" title="Apply ${c.id}'s processing settings to all other components">Apply to all</button>` : ''}<button class="btn small" data-act="procReset" ${hasProc(c) ? '' : 'disabled'} title="Reset ${c.id}'s processing to defaults">Reset</button></div>
     </div>` : (activeProc.length ? `<div class="proc-sum">${activeProc.map(esc).join(' · ')}</div>` : '')}
     <div class="cstats"></div></div>`;
 }
@@ -2958,7 +2960,7 @@ function renderConfig() {
     <div class="row"><label>Title</label><input data-k="axes.title" value="${esc(A.title)}" placeholder="none"></div>
     <div class="row"><button class="btn small" data-act="resetAxes">Reset axis settings</button></div>`;
   box.innerHTML = `
-    <section class="sec"><header><h3>Components</h3><span class="muted">${S.comps.length ? S.comps.length + ' defined' : ''}</span></header>
+    <section class="sec"><header><h3>Components</h3><span><span class="muted">${S.comps.length ? S.comps.length + ' defined' : ''}</span>${S.comps.some(hasProc) ? ` <button class="btn small" data-act="procResetAll" title="Reset processing on every component to defaults">Reset all processing</button>` : ''}</span></header>
       ${S.comps.map(compCard).join('') || `<div class="placeholder small">Click <b>+</b> next to a dataset in the tree (or double-click it for a quick plot). Each dataset becomes a component <b>A</b>, <b>B</b>, <b>C</b>… that you can slice, scale, detrend and filter, then map to plot axes.</div>`}
     </section>
     <section class="sec"><header><h3>Plot</h3></header>
@@ -3018,6 +3020,8 @@ function wireConfig() {
     else if (act === 'procCopy') { saveProcClip(c); renderConfig(); toast(`Copied processing settings from ${c.id}`); }
     else if (act === 'procPaste') { const v = loadProcClip(); if (!v) return; applyProc(c, v); renderConfig(); schedule(true); toast(`Pasted processing settings into ${c.id}`); }
     else if (act === 'procAll') { const v = { proc: c.proc, units: c.units }; const others = S.comps.filter(x => x !== c); others.forEach(x => applyProc(x, v)); renderConfig(); schedule(true); toast(`Applied ${c.id}'s processing to ${others.map(x => x.id).join(', ')}`); }
+    else if (act === 'procReset') { c.proc = { ...DEFAULT_PROC }; renderConfig(); schedule(true); toast(`Reset processing on ${c.id}`); }
+    else if (act === 'procResetAll') { const ids = S.comps.filter(hasProc).map(x => x.id); S.comps.forEach(x => { x.proc = { ...DEFAULT_PROC }; }); renderConfig(); schedule(true); toast(`Reset processing on ${ids.join(', ')}`); }
     else if (act === 'useFs') { S.plot.xsrc = 'time'; S.plot.time.mode = 'fs'; S.plot.time.fs = c.hint.fs.v; renderConfig(); schedule(true); }
     else if (act === 'useTime') { const tc = await addComponent(c.file, c.hint.time, { silent: true }); S.plot.xsrc = tc.id; renderConfig(); schedule(true); }
     else if (act === 'resetAxes') { Object.assign(S.plot.axes, { xlog: false, ylog: S.plot.type === 'psd', zlog: false, xmin: '', xmax: '', ymin: '', ymax: '', zmin: '', zmax: '', title: '', xlabel: '', ylabel: '', zlabel: '' }); renderConfig(); schedule(true); }

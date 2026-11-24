@@ -2563,7 +2563,7 @@ async function gatherHints(c) {
   await check(parent, (parentPath === '/' ? '/' : parentPath + '/') + '@');
   if (parent && parent.children) {
     const n = c.node.shape[c.axis] || c.node.shape[0];
-    for (const k of await parent.children()) if (k !== c.node && k.kind === 'dataset' && /^(time|times|t|timestamps?|time_s|elapsed)$/i.test(k.name) && k.shape.length === 1 && k.shape[0] === n) { c.hint.time = k; break; }
+    for (const k of await parent.children()) if (k !== c.node && k.kind === 'dataset' && (/^(time|times|timestamps?|time_s|elapsed)$/i.test(k.name) || k.name === 't') && k.shape.length === 1 && k.shape[0] === n) { c.hint.time = k; break; }
   }
 }
 function autoAssign(c) {

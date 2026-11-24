@@ -298,6 +298,7 @@ html { -webkit-text-size-adjust: 100%; } button, .tnode, .chip, .ptype, #mnav bu
     <li>Press <b>+</b> next to a dataset (or double-click it for a quick plot) to add it as a <b>component</b>. Components get letters A, B, C…</li>
     <li>Use the <b>Slice</b> field with numpy syntax: <code>:</code> all, <code>5</code> one index, <code>100:2000</code>, <code>::10</code> every 10th, <code>:, 2</code> column 2, <code>0, :, :</code> first frame of a cube. Fixed indices get sliders.</li>
     <li>The <b>processing</b> panel (sliders icon) applies, in order: scale × / offset +, detrend, Butterworth filter (zero-phase optional), smoothing, then an operation (single/double derivative or integral, dB, normalize…).</li>
+    <li><b>Legend labels</b>: by default series are named by sensor / group (<i>parent group/dataset [units]</i>); switch <i>Legend labels</i> to <i>letters</i> in the style settings to show component letters (A, B…) instead.</li>
     <li><b>Reuse processing</b>: in a component's processing panel, <i>Copy settings</i> saves them (kept in the browser across sessions and files), <i>Paste</i> applies them to another component, and <i>Apply to all</i> copies them to every other component.</li>
     <li><b>Integration drift</b>: integrating amplifies offsets and low-frequency noise into ramps (and parabolas for double integration). The double integral removes a linear trend after each pass; if a high-pass or band-pass filter is set, it is re-applied after each integration (the single integral does this too when such a filter is set). For acceleration → displacement, use a high-pass around 0.5 Hz with zero-phase on.</li>
     <li>Choose the <b>X axis</b>: sample index, a generated time axis (t₀ + sample rate or step), or another component. Its spacing defines the sample rate used by filters and spectra; you can override it.</li>
@@ -2228,7 +2229,7 @@ const S = {
     hist: { bins: 80, density: false },
     s3d: { style: 'surface', zAspect: 0.75 },
     axes: { xlog: false, ylog: false, zlog: false, xmin: '', xmax: '', ymin: '', ymax: '', zmin: '', zmax: '', cmap: 'viridis', reverse: false, title: '', xlabel: '', ylabel: '', zlabel: '' },
-    style: { mode: 'lines', width: 1.5, marker: 2.5, legend: true },
+    style: { mode: 'lines', width: 1.5, marker: 2.5, legend: true, labels: 'name' },
   },
 };
 const PLOT_TYPES = [
@@ -2664,14 +2665,20 @@ async function compValues(c, fs, warn) {
 }
 const compById = id => S.comps.find(c => c.id === id);
 const compLabel = c => (c.field ? c.name + '.' + c.field : c.name) + (c.units ? ` [${c.units}]` : '');
+/* legend label: sensor/group name (parent group / dataset) by default, or the component letter + dataset name */
+const groupName = c => { const parts = c.path.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] + '/' : ''; };
+const seriesLabel = (c, sub = '') => { if (S.plot.style.labels === 'id') return c.id + (sub ? '[' + sub + ']' : ':') + ' ' + compLabel(c);
+  const base = groupName(c) + compLabel(c); // same group/name twice (e.g. two files): prefix the letter so legend entries stay distinct
+  const dup = S.comps.some(o => o !== c && groupName(o) + compLabel(o) === base);
+  return (dup ? c.id + ': ' : '') + base + (sub ? ' [' + sub + ']' : ''); };
 
 /* signals from a component: list of {y, name} along its signal axis */
 function toSignals(c, v, warn, max = 16) {
-  if (v.shape.length <= 1) return [{ y: v.data, name: c.id + ': ' + compLabel(c) }];
+  if (v.shape.length <= 1) return [{ y: v.data, name: seriesLabel(c) }];
   if (v.shape.length > 2) { warn(`${c.id} is ${v.shape.length}-D (${shapeStr(v.shape)}) — slice it to 1-D or 2-D (e.g. "0, :, 3")`); return []; }
   const [r, k] = v.shape; const along0 = c.axis === 0; const n = along0 ? r : k, m = along0 ? k : r; const out = [];
   if (m > max) warn(`${c.id}: ${m} signals — showing the first ${max}. Use the slice to pick others.`);
-  for (let j = 0; j < Math.min(m, max); j++) { const y = new Float64Array(n); for (let i = 0; i < n; i++) y[i] = along0 ? v.data[i * k + j] : v.data[j * k + i]; out.push({ y, name: `${c.id}[${along0 ? ':, ' + j : j + ', :'}] ${compLabel(c)}` }); }
+  for (let j = 0; j < Math.min(m, max); j++) { const y = new Float64Array(n); for (let i = 0; i < n; i++) y[i] = along0 ? v.data[i * k + j] : v.data[j * k + i]; out.push({ y, name: seriesLabel(c, along0 ? ':, ' + j : j + ', :') }); }
   return out;
 }
 
@@ -2770,7 +2777,7 @@ async function doPlot(resetView) {
       if (xi.kind === 'index') warn('No sample rate defined — axes are in samples and cycles/sample');
     } else if (P.type === 'hist') {
       const ys = P.y.map(compById).filter(Boolean); if (!ys.length) throw new Error('Select one or more components');
-      const sigs = []; for (const c of ys) { const v = await compValues(c, xi.fs, warn); sigs.push({ y: v.data, name: c.id + ': ' + compLabel(c) }); }
+      const sigs = []; for (const c of ys) { const v = await compValues(c, xi.fs, warn); sigs.push({ y: v.data, name: seriesLabel(c) }); }
       let mn = Infinity, mx = -Infinity; for (const s2 of sigs) { const [a, b] = DSP.finiteRange(s2.y); mn = Math.min(mn, a); mx = Math.max(mx, b); }
       const xr = rng(A.xmin, A.xmax); if (isFinite(xr[0])) mn = xr[0]; if (isFinite(xr[1])) mx = xr[1];
       const traces = []; const exp = { headers: [], cols: [] };
@@ -2947,6 +2954,7 @@ function renderConfig() {
     </div>
     ${isGrid ? `<div class="row"><label>Colormap</label>${sel('axes.cmap', Object.keys(Plots.CMAPS), A.cmap)}${chk('axes.reverse', A.reverse, 'reverse')}</div><div class="cmap-prev" style="background:${cmapCss(A.cmap, A.reverse)}"></div>` : ''}
     ${!isGrid ? `<div class="row2"><div><label>Line width</label>${num('style.width', P.style.width)}</div><div><label>Marker size</label>${num('style.marker', P.style.marker)}</div><div>${chk('style.legend', P.style.legend, 'Legend')}</div></div>` : ''}
+    ${!isGrid && P.style.legend ? `<div class="row"><label>Legend labels</label>${sel('style.labels', [['name', 'sensor / group name'], ['id', 'letters (A, B…)']], P.style.labels || 'name')}</div>` : ''}
     <div class="row"><label>Title</label><input data-k="axes.title" value="${esc(A.title)}" placeholder="none"></div>
     <div class="row"><button class="btn small" data-act="resetAxes">Reset axis settings</button></div>`;
   box.innerHTML = `
@@ -2996,9 +3004,9 @@ function wireConfig() {
       schedule(k === 'slice' || k === 'field' || k === 'axis'); return;
     }
     setPath(S.plot, k, val);
-    if (['xsrc', 'time.mode', 'psd.kind', 'axes.cmap', 'axes.reverse', 'zcomp'].includes(k) && e.type === 'change') renderConfig();
+    if (['xsrc', 'time.mode', 'psd.kind', 'axes.cmap', 'axes.reverse', 'zcomp', 'style.legend'].includes(k) && e.type === 'change') renderConfig();
     if (['xsrc', 'time.fs', 'time.dt', 'fsOverride'].includes(k)) updateFsInfo();
-    schedule(/^(xsrc|xcomp|ycomp|zcomp|ccomp|transpose|psd\.kind|axes\.(x|y|z)log|axes\.(x|y|z)(min|max)|spg\.comp|s3d\.style|gridRes)$/.test(k));
+    schedule(/^(style.labels|xsrc|xcomp|ycomp|zcomp|ccomp|transpose|psd\.kind|axes\.(x|y|z)log|axes\.(x|y|z)(min|max)|spg\.comp|s3d\.style|gridRes)$/.test(k));
   };
   box.addEventListener('change', onChange);
   box.addEventListener('input', e => { const el = e.target; if (el.type === 'range' || (el.tagName === 'INPUT' && el.type === 'text' && !/slice|units|label|title/.test(el.dataset.k || ''))) { if (el.type === 'range' || el.dataset.k?.startsWith('proc.') || el.dataset.k?.startsWith('style.')) onChange(e); } });

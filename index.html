@@ -298,6 +298,7 @@ html { -webkit-text-size-adjust: 100%; } button, .tnode, .chip, .ptype, #mnav bu
     <li>Press <b>+</b> next to a dataset (or double-click it for a quick plot) to add it as a <b>component</b>. Components get letters A, B, C…</li>
     <li>Use the <b>Slice</b> field with numpy syntax: <code>:</code> all, <code>5</code> one index, <code>100:2000</code>, <code>::10</code> every 10th, <code>:, 2</code> column 2, <code>0, :, :</code> first frame of a cube. Fixed indices get sliders.</li>
     <li>The <b>processing</b> panel (sliders icon) applies, in order: scale × / offset +, detrend, Butterworth filter (zero-phase optional), smoothing, then an operation (single/double derivative or integral, dB, normalize…).</li>
+    <li><b>Custom function</b>: choose <i>custom f(x)…</i> as the operation and type an expression in <code>x</code> (value), <code>t</code> (time in s), <code>i</code> (sample index) and <code>fs</code>, using Math functions and <code>^</code> for power — e.g. <code>sin(x)</code>, <code>x^2 + 1</code>, <code>exp(-t)*x</code>.</li>
     <li><b>Legend labels</b>: by default series are named by sensor / group (<i>parent group/dataset [units]</i>); switch <i>Legend labels</i> to <i>letters</i> in the style settings to show component letters (A, B…) instead.</li>
     <li><b>Reuse processing</b>: in a component's processing panel, <i>Copy settings</i> saves them (kept in the browser across sessions and files), <i>Paste</i> applies them to another component, and <i>Apply to all</i> copies them to every other component. <i>Reset</i> clears one component's processing; <i>Reset all processing</i> (next to the Components heading) clears every component.</li>
     <li><b>Integration drift</b>: integrating amplifies offsets and low-frequency noise into ramps (and parabolas for double integration). The double integral removes a linear trend after each pass; if a high-pass or band-pass filter is set, it is re-applied after each integration (the single integral does this too when such a filter is set). For acceleration → displacement, use a high-pass around 0.5 Hz with zero-phase on.</li>
@@ -2532,7 +2533,7 @@ function defaultSlice(node) {
   if (sh.length === 2) return '';
   return sh.slice(0, -2).map(() => '0').concat([':', ':']).join(', ');
 }
-const DEFAULT_PROC = { scale: 1, offset: 0, detrend: 'none', ftype: 'none', order: 4, f1: '', f2: '', zerophase: true, smooth: 'none', swin: 9, op: 'none' };
+const DEFAULT_PROC = { scale: 1, offset: 0, detrend: 'none', ftype: 'none', order: 4, f1: '', f2: '', zerophase: true, smooth: 'none', swin: 9, op: 'none', expr: 'sin(x)' };
 const hasProc = c => Object.keys(DEFAULT_PROC).some(k => c.proc[k] != DEFAULT_PROC[k]);
 async function addComponent(f, node, opts = {}) {
   if (!plottable(node.dtype)) { toast('Only numeric datasets can be plotted', 'error'); return null; }
@@ -2616,6 +2617,23 @@ async function loadRaw(c) {
   return dataCache.get(key);
 }
 /* processing pipeline: scale/offset → detrend → filter → smoothing → operation; along signal axis */
+/* custom function f(x): x = value, t = time [s] from start, i = sample index, fs; Math functions/constants available, ^ = power */
+const exprCache = new Map();
+function compileExpr(src) {
+  src = String(src || '').trim(); if (exprCache.has(src)) return exprCache.get(src);
+  let f;
+  try {
+    if (!src) throw new Error('enter an expression, e.g. sin(x)');
+    // whitelist: arithmetic/comparison/ternary characters only, and identifiers limited to the variables and Math members
+    const bad = src.match(/[^\w\s.+\-*/%^()<>=!&|?:,]/); if (bad) throw new Error(`character "${bad[0]}" not allowed`);
+    const names = Object.getOwnPropertyNames(Math), allowed = new Set(['x', 't', 'i', 'fs', 'pi', 'e', ...names]);
+    for (const id of src.replace(/\b\d+(\.\d*)?(e[+-]?\d+)?\b|\.\d+(e[+-]?\d+)?/gi, ' ').match(/[A-Za-z_]\w*/g) || [])
+      if (!allowed.has(id)) throw new Error(`unknown name "${id}" — use x, t, i, fs, pi, e or Math functions`);
+    const g = new Function('x', 't', 'i', 'fs', `const {${names.join(',')}} = Math; const pi = Math.PI, e = Math.E; return (${src.replace(/\^/g, '**')});`);
+    g(1, 0, 0, 1); f = g;
+  } catch (e) { f = { error: e.message }; }
+  exprCache.set(src, f); if (exprCache.size > 50) exprCache.delete(exprCache.keys().next().value); return f;
+}
 function processSignal(x, p, fs, warn, id) {
   let y = x, hpf = null;
   if (p.detrend !== 'none') y = DSP.detrend(y, p.detrend);
@@ -2646,6 +2664,8 @@ function processSignal(x, p, fs, warn, id) {
     case 'zscore': { const s = DSP.stats(y); y = y.map(v => (v - s.mean) / (s.std || 1)); break; }
     case 'minmax': { const s = DSP.stats(y); y = y.map(v => (v - s.min) / ((s.max - s.min) || 1)); break; }
     case 'cumsum': { let a = 0; y = y.map(v => (a += v)); break; }
+    case 'expr': { const f = compileExpr(p.expr); if (f.error) { warn(`${id}: custom function — ${f.error}`); break; }
+      try { y = Float64Array.from(y, (v, i) => f(v, i / fs, i, fs)); } catch (e) { warn(`${id}: custom function — ${e.message}`); } break; }
   }
   return y;
 }
@@ -2905,7 +2925,8 @@ function compCard(c) {
       ${p.ftype !== 'none' ? `<div class="row2"><div><label>${band ? 'Low cut' : 'Cutoff'} [Hz]</label>${num('proc.f1', p.f1, 'placeholder="Hz"')}</div>${band ? `<div><label>High cut [Hz]</label>${num('proc.f2', p.f2, 'placeholder="Hz"')}</div>` : ''}<div><label>Order</label>${num('proc.order', p.order)}</div></div>
         <div class="row">${chk('proc.zerophase', p.zerophase, 'Zero-phase (forward–backward)')}</div><div class="hint">Butterworth design · sample rate <span class="fsv">…</span></div>` : ''}
       <div class="row"><label>Smoothing</label>${sel('proc.smooth', [['none', 'none'], ['mean', 'moving average'], ['median', 'moving median']], p.smooth)}${p.smooth !== 'none' ? num('proc.swin', p.swin, 'class="w60" title="window (samples)"') : ''}</div>
-      <div class="row"><label>Then</label>${sel('proc.op', [['none', 'no operation'], ['abs', '|x|'], ['square', 'x²'], ['deriv', 'derivative d/dt'], ['integ', 'integral ∫dt'], ['deriv2', 'double derivative d²/dt²'], ['integ2', 'double integral ∬dt²'], ['cumsum', 'cumulative sum'], ['db20', '20·log₁₀|x| (dB)'], ['db10', '10·log₁₀|x| (dB)'], ['zscore', 'normalize (z-score)'], ['minmax', 'normalize to 0–1']], p.op)}</div>
+      <div class="row"><label>Then</label>${sel('proc.op', [['none', 'no operation'], ['abs', '|x|'], ['square', 'x²'], ['deriv', 'derivative d/dt'], ['integ', 'integral ∫dt'], ['deriv2', 'double derivative d²/dt²'], ['integ2', 'double integral ∬dt²'], ['cumsum', 'cumulative sum'], ['db20', '20·log₁₀|x| (dB)'], ['db10', '10·log₁₀|x| (dB)'], ['zscore', 'normalize (z-score)'], ['minmax', 'normalize to 0–1'], ['expr', 'custom f(x)…']], p.op)}</div>
+      ${p.op === 'expr' ? `<div class="row"><label>f(x) =</label><input class="mono" data-k="proc.expr" value="${esc(p.expr)}" placeholder="sin(x)" spellcheck="false"></div><div class="hint">x = value, t = time [s], i = sample index, fs · Math functions (sin, exp, log, abs, sqrt, atan2, …), pi, e · ^ = power. E.g. <code>x^2</code>, <code>exp(-t)*x</code>, <code>abs(x) > 1 ? 1 : 0</code></div>` : ''}
       ${p.op === 'integ2' || p.op === 'integ' ? `<div class="hint">${(p.ftype === 'highpass' || p.ftype === 'bandpass')
         ? `Drift removal: linear detrend + the ${p.ftype} filter above re-applied after ${p.op === 'integ2' ? 'each integration pass' : 'integrating'}.`
         : p.op === 'integ2' ? 'Drift removal: linear detrend after each pass only. Set a high-pass (e.g. 0.5 Hz, zero-phase) for usable displacement — it is re-applied after each pass.'

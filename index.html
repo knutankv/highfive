@@ -297,7 +297,9 @@ html { -webkit-text-size-adjust: 100%; } button, .tnode, .chip, .ptype, #mnav bu
     <li><b>Open</b> one or more files (button or drag &amp; drop). Click groups to expand; the <b>Info</b> tab shows metadata and attributes, <b>Data</b> shows values as a table.</li>
     <li>Press <b>+</b> next to a dataset (or double-click it for a quick plot) to add it as a <b>component</b>. Components get letters A, B, C…</li>
     <li>Use the <b>Slice</b> field with numpy syntax: <code>:</code> all, <code>5</code> one index, <code>100:2000</code>, <code>::10</code> every 10th, <code>:, 2</code> column 2, <code>0, :, :</code> first frame of a cube. Fixed indices get sliders.</li>
-    <li>The <b>processing</b> panel (sliders icon) applies, in order: scale × / offset +, detrend, Butterworth filter (zero-phase optional), smoothing, then an operation (derivative, integral, dB, normalize…).</li>
+    <li>The <b>processing</b> panel (sliders icon) applies, in order: scale × / offset +, detrend, Butterworth filter (zero-phase optional), smoothing, then an operation (single/double derivative or integral, dB, normalize…).</li>
+    <li><b>Reuse processing</b>: in a component's processing panel, <i>Copy settings</i> saves them (kept in the browser across sessions and files), <i>Paste</i> applies them to another component, and <i>Apply to all</i> copies them to every other component.</li>
+    <li><b>Integration drift</b>: integrating amplifies offsets and low-frequency noise into ramps (and parabolas for double integration). The double integral removes a linear trend after each pass; if a high-pass or band-pass filter is set, it is re-applied after each integration (the single integral does this too when such a filter is set). For acceleration → displacement, use a high-pass around 0.5 Hz with zero-phase on.</li>
     <li>Choose the <b>X axis</b>: sample index, a generated time axis (t₀ + sample rate or step), or another component. Its spacing defines the sample rate used by filters and spectra; you can override it.</li>
     <li>For 2-D components, choose which dimension the signals run along — each column (or row) becomes its own trace.</li>
   </ul>
@@ -2612,7 +2614,7 @@ async function loadRaw(c) {
 }
 /* processing pipeline: scale/offset → detrend → filter → smoothing → operation; along signal axis */
 function processSignal(x, p, fs, warn, id) {
-  let y = x;
+  let y = x, hpf = null;
   if (p.detrend !== 'none') y = DSP.detrend(y, p.detrend);
   if (p.ftype !== 'none') {
     const f1 = parseFloat(p.f1), f2 = parseFloat(p.f2); const band = p.ftype === 'bandpass' || p.ftype === 'bandstop';
@@ -2621,7 +2623,8 @@ function processSignal(x, p, fs, warn, id) {
       const order = Math.max(1, Math.min(12, Math.round(numOr(p.order, 4))));
       const sos = DSP.butter(order, band ? [f1, f2] : f1, fs, p.ftype);
       const hasNaN = y.some(v => !isFinite(v)); if (hasNaN) { y = Float64Array.from(y, v => isFinite(v) ? v : 0); warn(`${id}: non-finite values replaced by 0 before filtering`); }
-      y = p.zerophase ? DSP.sosfiltfilt(sos, y) : DSP.sosfilt(sos, y);
+      const run = v => p.zerophase ? DSP.sosfiltfilt(sos, v) : DSP.sosfilt(sos, v);
+      y = run(y); if (p.ftype === 'highpass' || p.ftype === 'bandpass') hpf = run;
     } catch (e) { warn(`${id}: filter skipped — ${e.message}`); }
   }
   if (p.smooth === 'mean') y = DSP.movingAverage(y, numOr(p.swin, 9)); else if (p.smooth === 'median') y = DSP.movingMedian(y, numOr(p.swin, 9));
@@ -2629,7 +2632,12 @@ function processSignal(x, p, fs, warn, id) {
     case 'abs': y = y.map(Math.abs); break;
     case 'square': y = y.map(v => v * v); break;
     case 'deriv': y = DSP.gradient(y).map(v => v * fs); break;
-    case 'integ': y = DSP.cumtrapz(y).map(v => v / fs); break;
+    case 'integ': y = DSP.cumtrapz(y).map(v => v / fs); if (hpf) y = hpf(DSP.detrend(y, 'linear')); break;
+    case 'deriv2': y = DSP.gradient(DSP.gradient(y)).map(v => v * fs * fs); break;
+    case 'integ2': { // integration constants grow into ramps/parabolas: remove drift after each pass, re-applying the high-pass if set
+      const dedrift = v => { v = DSP.detrend(v, 'linear'); return hpf ? hpf(v) : v; };
+      y = dedrift(DSP.cumtrapz(dedrift(y)).map(v => v / fs));
+      y = dedrift(DSP.cumtrapz(y).map(v => v / fs)); break; }
     case 'db20': y = y.map(v => 20 * Math.log10(Math.abs(v))); break;
     case 'db10': y = y.map(v => 10 * Math.log10(Math.abs(v))); break;
     case 'zscore': { const s = DSP.stats(y); y = y.map(v => (v - s.mean) / (s.std || 1)); break; }
@@ -2858,6 +2866,10 @@ const sel = (k, opts, v, extra = '') => `<select data-k="${k}" ${extra}>${opts.m
 const num = (k, v, extra = '') => `<input type="text" inputmode="decimal" data-k="${k}" value="${esc(v)}" ${extra}>`;
 const chk = (k, v, label) => `<label class="chk"><input type="checkbox" data-k="${k}" ${v ? 'checked' : ''}><span>${label}</span></label>`;
 const compOpts = (none = 'index') => [['', none], ...S.comps.map(c => [c.id, c.id + ' · ' + compLabel(c)])];
+/* processing settings clipboard: persisted so it survives reloads / other files */
+function loadProcClip() { try { return JSON.parse(localStorage.getItem('h5s-proc') || 'null'); } catch (e) { return null; } }
+function saveProcClip(c) { const v = { proc: { ...c.proc }, units: c.units }; try { localStorage.setItem('h5s-proc', JSON.stringify(v)); } catch (e) { /* */ } return v; }
+function applyProc(c, v) { c.proc = { ...c.proc, ...v.proc }; if (v.units) c.units = v.units; }
 function compCard(c) {
   const p = c.proc; let shape = '', err = '';
   try { shape = shapeStr(parseSlice(c.slice, c.node.shape).outShape.concat(c.node.dtype.cls === 'array' ? c.node.dtype.dims : [])); } catch (e) { err = e.message; }
@@ -2884,7 +2896,12 @@ function compCard(c) {
       ${p.ftype !== 'none' ? `<div class="row2"><div><label>${band ? 'Low cut' : 'Cutoff'} [Hz]</label>${num('proc.f1', p.f1, 'placeholder="Hz"')}</div>${band ? `<div><label>High cut [Hz]</label>${num('proc.f2', p.f2, 'placeholder="Hz"')}</div>` : ''}<div><label>Order</label>${num('proc.order', p.order)}</div></div>
         <div class="row">${chk('proc.zerophase', p.zerophase, 'Zero-phase (forward–backward)')}</div><div class="hint">Butterworth design · sample rate <span class="fsv">…</span></div>` : ''}
       <div class="row"><label>Smoothing</label>${sel('proc.smooth', [['none', 'none'], ['mean', 'moving average'], ['median', 'moving median']], p.smooth)}${p.smooth !== 'none' ? num('proc.swin', p.swin, 'class="w60" title="window (samples)"') : ''}</div>
-      <div class="row"><label>Then</label>${sel('proc.op', [['none', 'no operation'], ['abs', '|x|'], ['square', 'x²'], ['deriv', 'derivative d/dt'], ['integ', 'integral ∫dt'], ['cumsum', 'cumulative sum'], ['db20', '20·log₁₀|x| (dB)'], ['db10', '10·log₁₀|x| (dB)'], ['zscore', 'normalize (z-score)'], ['minmax', 'normalize to 0–1']], p.op)}</div>
+      <div class="row"><label>Then</label>${sel('proc.op', [['none', 'no operation'], ['abs', '|x|'], ['square', 'x²'], ['deriv', 'derivative d/dt'], ['integ', 'integral ∫dt'], ['deriv2', 'double derivative d²/dt²'], ['integ2', 'double integral ∬dt²'], ['cumsum', 'cumulative sum'], ['db20', '20·log₁₀|x| (dB)'], ['db10', '10·log₁₀|x| (dB)'], ['zscore', 'normalize (z-score)'], ['minmax', 'normalize to 0–1']], p.op)}</div>
+      ${p.op === 'integ2' || p.op === 'integ' ? `<div class="hint">${(p.ftype === 'highpass' || p.ftype === 'bandpass')
+        ? `Drift removal: linear detrend + the ${p.ftype} filter above re-applied after ${p.op === 'integ2' ? 'each integration pass' : 'integrating'}.`
+        : p.op === 'integ2' ? 'Drift removal: linear detrend after each pass only. Set a high-pass (e.g. 0.5 Hz, zero-phase) for usable displacement — it is re-applied after each pass.'
+        : 'Plain running integral. Set a high-pass to remove drift (it is then re-applied after integrating).'}</div>` : ''}
+      <div class="row"><button class="btn small" data-act="procCopy" title="Save these processing settings (kept across sessions)">Copy settings</button><button class="btn small" data-act="procPaste" ${loadProcClip() ? '' : 'disabled'} title="Apply the saved processing settings to ${c.id}">Paste</button>${S.comps.length > 1 ? `<button class="btn small" data-act="procAll" title="Apply ${c.id}'s processing settings to all other components">Apply to all</button>` : ''}</div>
     </div>` : (activeProc.length ? `<div class="proc-sum">${activeProc.map(esc).join(' · ')}</div>` : '')}
     <div class="cstats"></div></div>`;
 }
@@ -2990,6 +3007,9 @@ function wireConfig() {
     const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; const card = b.closest('.comp'); const c = card ? compById(card.dataset.c) : compById(b.dataset.c);
     if (act === 'toggle') { c.expanded = !c.expanded; renderConfig(); }
     else if (act === 'remove') { S.comps = S.comps.filter(x => x !== c); cleanupRefs(c.id); renderConfig(); schedule(true); }
+    else if (act === 'procCopy') { saveProcClip(c); renderConfig(); toast(`Copied processing settings from ${c.id}`); }
+    else if (act === 'procPaste') { const v = loadProcClip(); if (!v) return; applyProc(c, v); renderConfig(); schedule(true); toast(`Pasted processing settings into ${c.id}`); }
+    else if (act === 'procAll') { const v = { proc: c.proc, units: c.units }; const others = S.comps.filter(x => x !== c); others.forEach(x => applyProc(x, v)); renderConfig(); schedule(true); toast(`Applied ${c.id}'s processing to ${others.map(x => x.id).join(', ')}`); }
     else if (act === 'useFs') { S.plot.xsrc = 'time'; S.plot.time.mode = 'fs'; S.plot.time.fs = c.hint.fs.v; renderConfig(); schedule(true); }
     else if (act === 'useTime') { const tc = await addComponent(c.file, c.hint.time, { silent: true }); S.plot.xsrc = tc.id; renderConfig(); schedule(true); }
     else if (act === 'resetAxes') { Object.assign(S.plot.axes, { xlog: false, ylog: S.plot.type === 'psd', zlog: false, xmin: '', xmax: '', ymin: '', ymax: '', zmin: '', zmax: '', title: '', xlabel: '', ylabel: '', zlabel: '' }); renderConfig(); schedule(true); }
